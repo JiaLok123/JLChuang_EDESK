@@ -1,0 +1,421 @@
+﻿@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="row">
+    <div class="col-sm-2">
+        <ul class="nav nav-pills nav-stacked" id="leftTabs">
+            <li class="active"><a href="#homeTab" data-toggle="tab">Home</a></li>
+            <li><a href="#profileTab" data-toggle="tab">Profile</a></li>
+            <li><a href="#messagesTab" data-toggle="tab">Messages</a></li>
+            <li><a href="#settingsTab" data-toggle="tab">Settings</a></li>
+        </ul>
+    </div>
+
+    <div class="col-sm-10">
+        <div class="tab-content">
+            <div class="tab-pane active" id="homeTab">
+                <h4>Home Tab.</h4>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <!-- Views/Home/Index.cshtml -->
+                        <div class="tree-menu">
+                            <h5>Tree Menu</h5>
+                            <ul id="tree" class="list-unstyled"></ul>
+                        </div>
+                    </div>
+
+                    <div class="col-sm-9">
+                        <div class="content-area">
+                            <h4>Customer Details</h4>
+                            <table class="table table-striped" id="customerTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Address</th>
+                                        <th>City</th>
+                                        <th>Pin Code</th>
+                                        <th>Country</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody"></tbody>
+                            </table>
+                            <!-- Pagination -->
+                            <nav>
+                                <ul class="pagination" id="pagination" style="list-style: none; display: flex; gap: 5px; padding: 0; margin-left: auto;"></ul>
+
+                            </nav>
+                            <p id="tableInfo" style="font-size:12px;color:#666;"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane" id="profileTab">
+                <h4>Profile</h4>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="UserID">UserID</label>
+                        <input type="text" class="form-control" id="UserID" name="UserID" />
+                    </div>
+                    <div class="form-group">
+                        <label for="Password">Password</label>
+                        <input type="password" class="form-control" id="Password" name="Password" />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+                <div id="loginResult"></div>
+            </div>
+
+            <div class="tab-pane" id="messagesTab"><p>Messages tab</p></div>
+            <div class="tab-pane" id="settingsTab"><p>Settings tab</p></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Customer Details</h4>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            $(document).ready(function () {
+                var pageSize = 5;       // 5 records per page
+                var currentPage = 1;
+                var data = [];          // will hold all records
+            
+                $.getJSON('/Home/GetCustomers', function (result) {
+                    data = result;
+                    currentPage = 1;
+                    renderTable();
+                    renderPagination();
+                });
+
+                function renderTable() {
+                    var $tbody = $('#customerTable tbody');
+                    $tbody.empty();
+
+                    var start = (currentPage - 1) * pageSize;
+                    var end = start + pageSize;
+                    var pageData = data.slice(start, end);
+
+                    pageData.forEach(function (c) {
+                        var row = `<tr>
+                            <td>${c.id}</td>
+                            <td>${c.name}</td>
+                            <td>${c.address}</td>
+                            <td>${c.city}</td>
+                            <td>${c.pinCode}</td>
+                            <td>${c.country}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info view-btn" data-id="${c.id}">View</button>
+                            </td>
+                        </tr>`;
+                        $tbody.append(row);
+                    });
+
+                    // update showing info
+                    var showingStart = start + 1;
+                    var showingEnd = Math.min(end, data.length);
+                    $('#tableInfo').text(`Showing ${showingStart} to ${showingEnd} out of ${data.length} entries`);
+                }
+
+                // Render pagination
+                function renderPagination() {
+                    var $pagination = $('#pagination');
+                    $pagination.empty();
+
+                    var pageCount = Math.ceil(data.length / pageSize);
+
+                    // previous button
+                    var prev = $('<li>').addClass('page-item').append(
+                        $('<a>').addClass('page-link').attr('href', '#').text('<').data('page', Math.max(currentPage - 1, 1))
+                    );
+                    $pagination.append(prev);
+
+                    // page numbers
+                    for (var i = 1; i <= pageCount; i++) {
+                        var li = $('<li>').addClass('page-item');
+                        if (i === currentPage) li.addClass('active');
+                        var a = $('<a>').addClass('page-link').attr('href', '#').text(i).data('page', i);
+                        li.append(a);
+                        $pagination.append(li);
+                    }
+
+                    // next button
+                    var next = $('<li>').addClass('page-item').append(
+                        $('<a>').addClass('page-link').attr('href', '#').text('>').data('page', Math.min(currentPage + 1, pageCount))
+                    );
+                    $pagination.append(next);
+                }
+
+                // handle pagination click
+                $('#pagination').on('click', '.page-link', function (e) {
+                    e.preventDefault();
+                    currentPage = $(this).data('page');
+                    renderTable();
+                    renderPagination();
+                });
+
+                        // handle city click filter
+                $(document).on('click', '.tree-node.city', function (e) {
+                    e.preventDefault();
+                    var city = $(this).data('node');
+
+                    $.getJSON('/Home/GetCustomers', { city: city }, function (result) {
+                        data = result;      // replace data with filtered data
+                        currentPage = 1;    // reset to first page
+                        renderTable();
+                        renderPagination();
+                    });
+                });
+
+                $(document).on('click', '.tree-node.country', function (e) {
+                    e.preventDefault();
+                    var country = $(this).data('node');
+
+                    $.getJSON('/Home/GetCustomers', { country: country }, function (result) {
+                        data = result;      // replace data with filtered data
+                        currentPage = 1;    // reset to first page
+                        renderTable();
+                        renderPagination();
+                    });
+                });
+
+                $(document).on('click', '.tree-node.pin', function (e) {
+                    e.preventDefault();
+                    var pin = $(this).data('node');
+
+                    $.getJSON('/Home/GetCustomers', { pinCode: pin }, function (result) {
+                        data = result;      // replace data with filtered data
+                        currentPage = 1;    // reset to first page
+                        renderTable();
+                        renderPagination();
+                    });
+                });
+
+                $(document).on('click', '.tree-node.all', function (e) {
+                    e.preventDefault();
+
+                    $.getJSON('/Home/GetCustomers', function (result) {
+                        data = result;      // replace data with filtered data
+                        currentPage = 1;    // reset to first page
+                        renderTable();
+                        renderPagination();
+                    });
+                });
+            
+                $(document).on('click', '.view-btn', function () {
+                    var id = $(this).data('id');
+                    $.getJSON('/Customer/GetById/' + id, function (row) {
+                        var html = `<dl>
+                            <dt>ID</dt><dd>${row.id}</dd>
+                            <dt>Name</dt><dd>${row.name}</dd>
+                            <dt>Address</dt><dd>${row.address}</dd>
+                            <dt>City</dt><dd>${row.city}</dd>
+                            <dt>Pin</dt><dd>${row.pinCode}</dd>
+                            <dt>Country</dt><dd>${row.country}</dd>
+                        </dl>`;
+                        $('#modalBody').html(html);
+                        $('#viewModal').modal('show');
+                    });
+                });
+            });
+
+
+
+            $(document).on('click', '.view-btn', function() {
+                var id = $(this).data('id');
+
+                $.ajax({
+                    url: '/Home/GetById/' + id,
+                    type: 'GET',
+                    success: function(row) {
+                        // Fill modal
+                        var html = `<dl class="dl-horizontal">
+                            <dt>ID</dt><dd>${row.id}</dd>
+                            <dt>Name</dt><dd>${row.name}</dd>
+                            <dt>Address</dt><dd>${row.address}</dd>
+                            <dt>City</dt><dd>${row.city}</dd>
+                            <dt>Pin</dt><dd>${row.pinCode}</dd>
+                            <dt>Country</dt><dd>${row.country}</dd>
+                        </dl>`;
+                        $('#modalBody').html(html);
+                        $('#viewModal').modal('show');
+                    },
+                    error: function() {
+                        alert('Unable to retrieve data.');
+                    }
+                });
+            });
+
+            // Login form
+            $('#loginForm').submit(function (e) {
+                e.preventDefault();
+                var formData = {
+                    UserID: $('#UserID').val(),
+                    Password: $('#Password').val()
+                };
+                $('#loginResult').html('<pre>' + JSON.stringify(formData, null, 2) + '</pre>');
+                console.log('Form Data:', formData);
+            });
+        });
+    </script>
+
+    <script>
+        $(document).ready(function () {
+            $.getJSON('/Home/GetTreeData', function (data) {
+                var $tree = $('#tree');
+                $tree.empty();
+
+                    // Add "All" node at the top
+                var $allNode = $('<li>').append(`<a href="#" class="tree-node all" data-node="all">All</a>`);
+                $tree.append($allNode);
+
+
+                data.forEach(function (item) {
+                    // Country node
+                    var $countryNode = $('<li class="parent-node">')
+                        .append(`<a href="#" class="tree-node country" data-node="${item.country}">${item.country}</a>`);
+
+                    if (item.cities && item.cities.length > 0) {
+                        var $cityList = $('<ul class="child-nodes">'); // initially hidden via CSS if desired
+
+                        item.cities.forEach(function (cityItem) {
+                            // City node
+                            var $cityNode = $('<li class="parent-node">')
+                                .append(`<a href="#" class="tree-node city" data-node="${cityItem.city}">${cityItem.city}</a>`);
+
+                            if (cityItem.pinCodes && cityItem.pinCodes.length > 0) {
+                                var $pinList = $('<ul class="child-nodes">');
+                                cityItem.pinCodes.forEach(function (pin) {
+                                    var $pinNode = $('<li>')
+                                        .append(`<a href="#" class="tree-node pin" data-node="${pin}">${pin}</a>`);
+                                    $pinList.append($pinNode);
+                                });
+                                $cityNode.append($pinList);
+                            }
+
+                            $cityList.append($cityNode);
+                        });
+
+                        $countryNode.append($cityList);
+                    }
+
+                    $tree.append($countryNode);
+                });
+
+                // Toggle country
+                $tree.on('click', '.tree-node.country', function (e) {
+                    e.preventDefault();
+                    $(this).siblings('.child-nodes').slideToggle();
+                    $(this).toggleClass('expanded');
+                });
+
+                // Toggle city
+                $tree.on('click', '.tree-node.city', function (e) {
+                    e.preventDefault();
+                    $(this).siblings('.child-nodes').slideToggle();
+                    $(this).toggleClass('expanded');
+                });
+
+                // **Initially expand all nodes**
+                $tree.find('.child-nodes').show();
+                $tree.find('.tree-node.country, .tree-node.city').addClass('expanded');
+            });
+
+            // Handle clicks on tree nodes
+            // $(document).on('click', '.tree-node.city', function (e) {
+            //     e.preventDefault();
+            //     var city = $(this).data('node');
+
+            //     $.getJSON('/Home/GetCustomers', { city: city }, function (data) {
+            //         var $tbody = $('#customerTable tbody');
+            //         $tbody.empty();
+
+            //         data.forEach(function (c) {
+            //             var row = `<tr>
+            //                 <td>${c.id}</td>
+            //                 <td>${c.name}</td>
+            //                 <td>${c.address}</td>
+            //                 <td>${c.city}</td>
+            //                 <td>${c.pinCode}</td>
+            //                 <td>${c.country}</td>
+            //                 <td>
+            //                     <button class="btn btn-sm btn-info view-btn" data-id="${c.id}">View</button>
+            //                 </td>
+            //             </tr>`;
+            //             $tbody.append(row);
+            //         });
+            //     });
+            // });
+
+            // // Handle clicks on tree nodes
+            // $(document).on('click', '.tree-node.country', function (e) {
+            //     e.preventDefault();
+            //     var country = $(this).data('node');
+
+            //     $.getJSON('/Home/GetCustomers', { country: country }, function (data) {
+            //         var $tbody = $('#customerTable tbody');
+            //         $tbody.empty();
+
+            //         data.forEach(function (c) {
+            //             var row = `<tr>
+            //                 <td>${c.id}</td>
+            //                 <td>${c.name}</td>
+            //                 <td>${c.address}</td>
+            //                 <td>${c.city}</td>
+            //                 <td>${c.pinCode}</td>
+            //                 <td>${c.country}</td>
+            //                 <td>
+            //                     <button class="btn btn-sm btn-info view-btn" data-id="${c.id}">View</button>
+            //                 </td>
+            //             </tr>`;
+            //             $tbody.append(row);
+            //         });
+            //     });
+            // });
+
+            // // Handle clicks on tree nodes
+            // $(document).on('click', '.tree-node.pin', function (e) {
+            //     e.preventDefault();
+            //     var pin = $(this).data('node');
+
+            //     $.getJSON('/Home/GetCustomers', { pinCode: pin }, function (data) {
+            //         var $tbody = $('#customerTable tbody');
+            //         $tbody.empty();
+
+            //         data.forEach(function (c) {
+            //             var row = `<tr>
+            //                 <td>${c.id}</td>
+            //                 <td>${c.name}</td>
+            //                 <td>${c.address}</td>
+            //                 <td>${c.city}</td>
+            //                 <td>${c.pinCode}</td>
+            //                 <td>${c.country}</td>
+            //                 <td>
+            //                     <button class="btn btn-sm btn-info view-btn" data-id="${c.id}">View</button>
+            //                 </td>
+            //             </tr>`;
+            //             $tbody.append(row);
+            //         });
+            //     });
+            // });
+        });
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="~/js/bootstrap.min.js"></script>
+
+}
